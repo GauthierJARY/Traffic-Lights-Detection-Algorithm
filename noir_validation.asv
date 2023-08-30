@@ -1,0 +1,86 @@
+function [y_valid,x_valid] = filterDetections(y,x,L,RGYB)  %Les feux de signalisation sont en fait un boitier noir possédant 3 ampoules, cette zone noir peut servir à filtrer les candidats
+    
+    x_valid = 0; % Initialisation des variables de sortie
+    y_valid = 0;
+   
+    if(x>=1&&y>=1)
+        [x,y,bas_lampe,haut_lampe,cote_lampe_g,cote_lampe_d] = find_center(x,y,RGYB); %Il nous faut détecter le centre afin de  vérifier si un rectangle noir se trouve bien en dessous
+        
+        if(haut_lampe/bas_lampe<=2&&cote_lampe_g/cote_lampe_d<=2&&haut_lampe/cote_lampe_g<=2)%si la lampe a une forme plus ou moins circulaire 
+            [height,width]= size(L);
+            seuil_darkness = 30;  % seuil sous lequel on considère que la luminosité peut être celle d'un boitier de feu de signalisation. 
+            bas_feu = 3*(bas_lampe+haut_lampe); % estimation de la taille du feu afin de tester la présence de la zone noire 
+            cote_lampe = min(cote_lampe_g,cote_lampe_d);%idem
+            moy = mean(L([min(height-1,y+bas_lampe):min(height-1,y+bas_feu)],[max(1,x-cote_lampe):min(width,x+cote_lampe)]),'all'); % On moyenne la luminosité dans la zone
+          
+            if(moy<seuil_darkness) % on test la valeur moyenne
+                x_valid = x;
+                y_valid = y;
+            else
+                 rectangle('Position',[x,y,5,5],'EdgeColor', 'g','LineWidth',2) %marqueur pour repérer la raison pour laquelle on a refusé le candidat
+                 x_valid = -500;
+                 y_valid = -500;
+            end
+   
+        else
+            rectangle('Position',[x,y,5,5],'EdgeColor', 'b','LineWidth',2)%marqueur pour repérer la raison pour laquelle on a refusé le candidat
+            x_valid = -500;
+            y_valid = -500;
+        end    
+
+    end
+
+end
+
+function [x_center,y_center,bas_lampe,haut_lampe,cote_lampe_g,cote_lampe_d] = find_center(x,y,RGYB)
+
+    [height,width]= size(RGYB);
+    i_max = 1;
+    i_min = 1;
+    j_max = 1;
+    j_min = 1;
+    seuil = 0.6*RGYB(y,x); 
+  
+    while(x+i_max<width && RGYB(y,x+i_max)>seuil)
+        i_max=i_max+1;
+    end
+    
+    while(x-i_min>1 && RGYB(y,x-i_min)>seuil)
+        i_min=i_min+1;
+    end
+    
+    while(y+j_max<height && RGYB(y+j_max,x)>seuil)
+        j_max=j_max+1;
+    end
+    
+    while(y-j_min>1 && RGYB(y-j_min,x)>seuil)
+        j_min=j_min+1;
+    end
+
+    x_center = round(x +0.5*(-i_min+i_max));
+    y_center = round(y +0.5*(-j_min+j_max));
+
+    i_max = 1;
+    i_min = 1;
+    j_max = 1;
+
+    %On effectue une deuxième fois pour récupérer la largeur et la hauteur du
+    %feu
+
+    while(x_center+i_max<width && RGYB(y_center,x_center+i_max)>seuil)
+        i_max=i_max+1;
+    end
+    
+    while(x_center-i_min>1 && RGYB(y_center,x_center-i_min)>seuil)
+        i_min=i_min+1;
+    end
+    
+    while(y_center+j_max<height && RGYB(y_center+j_max,x_center)>seuil)
+        j_max=j_max+1;
+    end
+
+    bas_lampe = j_max;
+    haut_lampe = j_min;
+    cote_lampe_d = i_max;
+    cote_lampe_g = i_min;
+end
